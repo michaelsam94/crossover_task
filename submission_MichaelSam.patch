@@ -1,0 +1,507 @@
+diff --git a/App.tsx b/App.tsx
+index f8b946d..2620393 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,20 +1,468 @@
+-import { StatusBar } from 'expo-status-bar';
+-import { StyleSheet, Text, View } from 'react-native';
++import React, { useState, useEffect } from 'react';
++import { StatusBar, StyleSheet, Text, View, ImageBackground, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
++import { SvgUri } from 'react-native-svg';
++import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
++import { NavigationContainer } from '@react-navigation/native';
++
++const { width, height } = Dimensions.get('window');
++
++const Tab = createBottomTabNavigator();
++
++function HomeScreen() {
++    const [questionData, setQuestionData] = useState(null);
++    const [selectedAnswer, setSelectedAnswer] = useState(null);
++    const [revealData, setRevealData] = useState(null);
++    const [timer, setTimer] = useState(0);
++    const [scrollIndex, setScrollIndex] = useState(0); // Track the scroll index
++
++    useEffect(() => {
++      fetchQuestionData();
++      const interval = setInterval(() => {
++        setTimer(prevTimer => prevTimer + 1);
++      }, 1000);
++      return () => clearInterval(interval);
++    }, []);
++
++    useEffect(() => {
++      if (revealData) {
++        // No animation
++      }
++    }, [revealData]);
++
++    const fetchQuestionData = async () => {
++      try {
++        const response = await fetch('https://cross-platform.rp.devfactory.com/for_you');
++        const data = await response.json();
++        setQuestionData(data);
++      } catch (error) {
++        console.error('Error fetching question data:', error);
++      }
++    };
++
++    const fetchRevealData = async (id) => {
++      try {
++        const response = await fetch(`https://cross-platform.rp.devfactory.com/reveal?id=${id}`);
++        const data = await response.json();
++        setRevealData(data);
++      } catch (error) {
++        console.error('Error fetching reveal data:', error);
++      }
++    };
++
++    const handleAnswerPress = async (option) => {
++      setSelectedAnswer(option);
++      await fetchRevealData(questionData.id);
++    };
++
++    const getOptionBackgroundColor = (optionId) => {
++      if (!revealData || selectedAnswer === null) return '#fff'; // Default color for unselected options
++      const isCorrect = revealData.correct_options.find(option => option.id === optionId);
++      return selectedAnswer === optionId ? (isCorrect ? 'green' : 'red') : '#fff'; // Change color only for selected option
++    };
++
++    const formatTime = (seconds) => {
++      const days = Math.floor(seconds / (3600 * 24));
++      const hours = Math.floor((seconds % (3600 * 24)) / 3600);
++      const minutes = Math.floor((seconds % 3600) / 60);
++      if (days > 0) return `${days}d`;
++      if (hours > 0) return `${hours}h`;
++      if (minutes > 0) return `${minutes}m`;
++      return '1m';
++    };
++
++    const handleScroll = async (event) => {
++        const scrollPosition = event.nativeEvent.contentOffset.y;
++        const contentHeight = event.nativeEvent.contentSize.height;
++        const screenHeight = height;
++        const scrollThreshold = 20; // Adjust as needed
++        
++        if (scrollPosition < scrollThreshold) {
++          // Fetch new question data when scrolled to the top
++          await fetchQuestionData();
++        } else if (scrollPosition > contentHeight - screenHeight - scrollThreshold) {
++          // Fetch new question data when scrolled to the bottom
++          setScrollIndex(prevIndex => prevIndex + 1);
++        }
++      };
+ 
+-export default function App() {
+     return (
+-        <View style={styles.container}>
+-            <Text>Open up App.tsx to start working on your app!</Text>
+-            <StatusBar style="auto" />
+-        </View>
++      <ScrollView
++        style={styles.container}
++        onScroll={handleScroll}
++        scrollEventThrottle={10} // Adjust as needed
++        contentContainerStyle={styles.scrollViewContent}
++      >
++        <StatusBar hidden />
++        <ImageBackground
++          source={{ uri: questionData?.image }}
++          style={styles.backgroundImage}
++        >
++          <View style={styles.overlay}>
++            <View style={styles.timerContainer}>
++              <Text style={styles.timerText}>{formatTime(timer)}</Text>
++            </View>
++            <View style={styles.forYouContainer}>
++              <Text style={styles.forYouText}>For You</Text>
++              <View style={styles.lineSeparator} />
++            </View>
++            <TouchableOpacity style={styles.searchIconContainer}>
++              <SvgUri
++                width="20"
++                height="20"
++                uri={require('./assets/search.svg')}
++              />
++            </TouchableOpacity>
++            <View style={styles.questionContainer}>
++              {questionData && (
++                <View>
++                  <View style={styles.questionTextContainer}>
++                    <Text style={styles.questionText}>{questionData.question}</Text>
++                  </View>
++                </View>
++              )}
++            </View>
++            <View style={styles.bottomConatiner}>
++
++            <View style={styles.optionsAndDescription}>
++
++            <View style={styles.optionsContainer}>
++              {questionData && questionData.options.map((option, index) => (
++                <TouchableOpacity
++                  key={option.id}
++                  style={[
++                    styles.optionButton,
++                    { 
++                      backgroundColor: getOptionBackgroundColor(option.id),
++                      opacity: selectedAnswer === option.id ? 1 : 0.5 // Set opacity based on selection
++                    }
++                  ]}
++                  onPress={() => handleAnswerPress(option.id)}
++                >
++                  <Text style={styles.optionText}>{option.answer}</Text>
++                </TouchableOpacity>
++              ))}
++            </View>
++            <View style={styles.descriptionContainer}>
++              {questionData && (
++                <View>
++                  <Text style={styles.descriptionText}>{questionData.user.name}</Text>
++                  <Text style={styles.descriptionText}>{questionData.description}</Text>
++                  <View style={styles.playlistContainer}>
++                    <SvgUri source={require('./assets/playlist.svg')} />
++                    <Text style={styles.playlistText}>{questionData.playlist}</Text>
++                  </View>
++                </View>
++              )}
++            </View>
++            </View>
++
++            
++            <TouchableOpacity style={styles.avatarContainer}>
++            </TouchableOpacity>
++            <View style={styles.iconsContainer}>
++              <View style={styles.iconRow}>
++                <SvgUri source={require('./assets/heart.svg')} style={styles.icon} />
++                <Text style={styles.counterText}>100</Text>
++              </View>
++              <View style={styles.iconRow}>
++                <SvgUri source={require('./assets/bookmark.svg')} style={styles.icon} />
++                <Text style={styles.counterText}>50</Text>
++              </View>
++              <View style={styles.iconRow}>
++                <SvgUri source={require('./assets/share.svg')} style={styles.icon} />
++                <Text style={styles.counterText}>30</Text>
++              </View>
++            </View>
++          </View>
++
++            </View>
++            
++        </ImageBackground>
++      </ScrollView>
+     );
+ }
++const DiscoverScreen = () => {
++  return (
++    <View style={styles.tabContent}>
++      <Text>Discover Screen</Text>
++    </View>
++  );
++};
++
++const ActivityScreen = () => {
++  return (
++    <View style={styles.tabContent}>
++      <Text>Activity Screen</Text>
++    </View>
++  );
++};
++
++const BookmarksScreen = () => {
++  return (
++    <View style={styles.tabContent}>
++      <Text>Bookmarks Screen</Text>
++    </View>
++  );
++};
++
++const ProfileScreen = () => {
++  return (
++    <View style={styles.tabContent}>
++      <Text>Profile Screen</Text>
++    </View>
++  );
++};
+ 
+ const styles = StyleSheet.create({
+-    container: {
+-        flex: 1,
+-        backgroundColor: '#fff',
+-        alignItems: 'center',
+-        justifyContent: 'center',
+-    },
++  container: {
++    flex: 1,
++  },
++  scrollViewContent: {
++    flexGrow: 1,
++  },
++  backgroundImage: {
++    flex: 1,
++    width: '100%', // Ensure the background image covers the entire screen
++    height: '100%', // Ensure the background image covers the entire screen
++    resizeMode: 'cover',
++  },
++  overlay: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.5)', // Adjust opacity as needed
++  },
++  timerContainer: {
++    position: 'absolute',
++    top: 20,
++    left: 20,
++  },
++  timerText: {
++    color: '#fff',
++  },
++  forYouContainer: {
++    position: 'absolute',
++    top: 20,
++    alignSelf: 'center',
++    alignItems: 'center',
++  },
++  forYouText: {
++    color: '#fff',
++    marginBottom: 5,
++  },
++  lineSeparator: {
++    backgroundColor: '#fff',
++    height: 2,
++    width: 20,
++  },
++  searchIconContainer: {
++    position: 'absolute',
++    top: 20,
++    right: 20,
++  },
++  questionContainer: {
++    flex: 0.4,
++    width: '100%',
++    padding: 20,
++    marginTop: 30,
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  questionTextContainer: {
++    marginBottom: 10,
++    backgroundColor: 'rgba(0, 0, 0, 0.7)',
++    padding: 10,
++  },
++  questionText: {
++    color: '#fff',
++    fontSize: 20,
++    fontWeight: 'bold',
++  },
++  descriptionContainer: {
++    alignItems: 'flex-start',
++    marginBottom: 5,
++    marginStart: 10,
++  },
++  descriptionText: {
++    color: '#fff',
++    backgroundColor: 'rgba(0, 0, 0, 0.7)',
++    padding: 5,
++  },
++  playlistContainer: {
++    flexDirection: 'row',
++    alignItems: 'center',
++  },
++  playlistText: {
++    color: '#fff',
++    backgroundColor: '#333',
++    padding: 5,
++  },
++  bottomConatiner: {
++    flex: 1,
++    width: '100%',
++    height: '100%',
++    flexDirection: 'row',
++    
++  },
++  optionsAndDescription: {
++     flex: 1,
++     verticalAlign: 'bottom',
++     width: '90%',
++     height: '100%',
++     flexDirection: 'column',
++  },
++  optionsContainer: {
++    flex: 0.6,
++    width: '100%',
++    padding: 20,
++    flexDirection: 'column',
++    justifyContent: 'space-around',
++  },
++  optionButton: {
++    padding: 10,
++    borderRadius: 10,
++    alignItems: 'center',
++    marginBottom: 10,
++  },
++  optionText: {
++    color: '#fff',
++  },
++  avatarContainer: {
++    position: 'absolute',
++    bottom: 80,
++    left: 20,
++    flexDirection: 'row',
++    alignItems: 'center',
++  },
++  avatarImage: {
++    width: 50,
++    height: 50,
++    borderRadius: 25,
++  },
++  plusIcon: {
++    width: 20,
++    height: 20,
++    marginLeft: 10,
++  },
++  iconsContainer: {
++    alignItems: 'flex-end',
++    bottom: 20,
++    flexDirection: 'column',
++    justifyContent: 'space-between',
++    height: '60%',
++    marginEnd: 10,
++    width: '10%',
++  },
++  iconRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++  },
++  icon: {
++    width: 20,
++    height: 20,
++    marginRight: 5,
++  },
++  counterText: {
++    color: '#fff',
++  },
++  tabContent: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  tabBar: { // Add a specific style for the tab bar itself
++    backgroundColor: 'black', // Force black background
++  }
+ });
++
++export default function App() {
++  return (
++    <NavigationContainer>
++      <Tab.Navigator
++        screenOptions={{
++          tabBarActiveTintColor: 'white',
++          tabBarInactiveTintColor: 'gray',
++          tabBarStyle: {
++            backgroundColor: '#000',
++            borderTopColor: 'transparent'
++          }
++        }}
++        initialRouteName="Home"
++      >
++        <Tab.Screen
++          name="Home"
++          component={HomeScreen}
++          options={{
++            tabBarLabel: 'Home',
++            tabBarIcon: ({ color }) => (
++              <SvgUri
++                width="24"
++                height="24"
++                uri={require('./assets/home.svg')}
++                fill={color}
++              />
++            ),
++          }}
++        />
++        <Tab.Screen
++          name="Discover"
++          component={DiscoverScreen}
++          options={{
++            tabBarLabel: 'Discover',
++            tabBarIcon: ({ color }) => (
++              <SvgUri
++                width="24"
++                height="24"
++                uri={require('./assets/discover.svg')}
++                fill={color}
++              />
++            ),
++          }}
++        />
++        <Tab.Screen
++          name="Activity"
++          component={ActivityScreen}
++          options={{
++            tabBarLabel: 'Activity',
++            tabBarIcon: ({ color }) => (
++              <SvgUri
++                width="24"
++                height="24"
++                uri={require('./assets/activity.svg')}
++                fill={color}
++              />
++            ),
++          }}
++        />
++        <Tab.Screen
++          name="Bookmarks"
++          component={BookmarksScreen}
++          options={{
++            tabBarLabel: 'Bookmarks',
++            tabBarIcon: ({ color }) => (
++              <SvgUri
++                width="24"
++                height="24"
++                uri={require('./assets/bookmark.svg')}
++                fill={color}
++              />
++            ),
++          }}
++        />
++        <Tab.Screen
++          name="Profile"
++          component={ProfileScreen}
++          options={{
++            tabBarLabel: 'Profile',
++            tabBarIcon: ({ color }) => (
++              <SvgUri
++                width="24"
++                height="24"
++                uri={require('./assets/profile.svg')}
++                fill={color}
++              />
++            ),
++          }}
++        />
++      </Tab.Navigator>
++    </NavigationContainer>
++  );
++}
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index 7e7b288..db994d7 100644
+--- a/package.json
++++ b/package.json
+@@ -11,10 +11,14 @@
+         "lint": "eslint ."
+     },
+     "dependencies": {
++        "@react-navigation/bottom-tabs": "^6.5.20",
++        "@react-navigation/native": "^6.1.17",
+         "expo": "49.0.21",
+         "expo-status-bar": "1.6.0",
+         "react": "18.2.0",
+-        "react-native": "0.72.6"
++        "react-native": "0.72.6",
++        "react-native-reanimated": "^3.11.0",
++        "react-native-svg": "^15.2.0"
+     },
+     "devDependencies": {
+         "@babel/core": "7.23.5",
